@@ -11,7 +11,6 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
   <style>
     html, body, #map { 
       height: 100%; 
@@ -65,6 +64,46 @@
       animation: spin 1s linear infinite;
     }
     
+    .legend {
+      padding: 10px;
+      background: white;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      line-height: 1.5;
+    }
+    
+    .legend h4 {
+      margin: 0 0 8px;
+      text-align: center;
+    }
+    
+    .legend i {
+      width: 18px;
+      height: 12px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.8;
+    }
+    
+    .legend div {
+      margin-bottom: 4px;
+    }
+    
+    .export-btn {
+      padding: 6px 10px;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+      text-align: center;
+    }
+    
+    .export-btn:hover {
+      background: #f5f5f5;
+    }
+    
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -83,8 +122,8 @@
 <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 <script src="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.js"></script>
-<script src="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.js"></script>
-<script src="https://unpkg.com/dom-to-image"></script>
+<script src="https://unpkg.com/dom-to-image@2.6.0/dist/dom-to-image.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <script>
 // Basemaps
@@ -110,8 +149,7 @@ const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
 const map = L.map('map', {
   center: [-2.5, 117],
   zoom: 5,
-  layers: [satellite], // set default layer
-  fullscreenControl: true,
+  layers: [satellite],
   zoomControl: false
 });
 
@@ -154,7 +192,6 @@ const geojsonLayers = [
 function createPopup(feature) {
   let html = '<div class="popup-content"><table>';
   for (let key in feature.properties) {
-    // Skip properties yang kosong atau null
     if (feature.properties[key] !== null && feature.properties[key] !== "") {
       html += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
     }
@@ -192,7 +229,6 @@ geojsonLayers.forEach((layer) => {
       overlayLayers[layer.name] = geojson;
       map.addLayer(geojson);
 
-      // Simpan bounds untuk semua layer
       const bounds = geojson.getBounds();
       if (bounds.isValid()) {
         allBounds.push(bounds);
@@ -200,16 +236,13 @@ geojsonLayers.forEach((layer) => {
 
       loaded++;
       if (loaded === geojsonLayers.length) {
-        // Sembunyikan loading indicator
         document.getElementById('loading').style.display = 'none';
         
-        // Tambahkan layer control setelah semua layer dimuat
         L.control.layers(baseLayers, overlayLayers, {
           collapsed: false,
           position: 'topright'
         }).addTo(map);
 
-        // Fit bounds untuk semua layer yang valid
         if (allBounds.length > 0) {
           const combinedBounds = allBounds.reduce((acc, bounds) => {
             return acc.extend(bounds);
@@ -219,15 +252,6 @@ geojsonLayers.forEach((layer) => {
             map.fitBounds(combinedBounds, { padding: [50, 50] });
           }, 500);
         }
-
-        // MiniMap aktif setelah semua selesai
-        new L.Control.MiniMap(osm, { 
-          toggleDisplay: true, 
-          minimized: false,
-          position: 'bottomleft',
-          width: 200,
-          height: 150
-        }).addTo(map);
       }
     })
     .catch(err => {
@@ -257,6 +281,7 @@ L.control.measure({
   position: 'topleft'
 }).addTo(map);
 
+// Fullscreen control (hanya satu)
 L.control.fullscreen({
   position: 'topleft',
   title: 'Layar Penuh',
@@ -286,27 +311,54 @@ map.on('mousemove', function(e) {
 map.on('mouseout', function() {
   mousePosition.update();
 });
-  
-// Tambahkan legenda dinamis
-const legend = L.control({position: 'bottomright'});
-legend.onAdd = function() {
-  const div = L.DomUtil.create('div', 'legend');
-  div.innerHTML = `
-    <h4>Legenda</h4>
-    <div><i style="background:red"></i> Sesar Aktif</div>
-    <div><i style="background:orange"></i> Sesar Terindikasi</div>
-    <div><i style="background:blue"></i> Megathrust</div>
-  `;
-  return div;
-};
-legend.addTo(map);
-  
+
 // Tambahkan skala
 L.control.scale({
   position: 'bottomright',
   imperial: false,
   maxWidth: 200
 }).addTo(map);
+
+// Legenda Interaktif
+const legend = L.control({position: 'bottomright'});
+legend.onAdd = function() {
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = `
+    <h4>Legenda</h4>
+    <div><i style="background: red"></i> Sesar Aktif 2017</div>
+    <div><i style="background: orange"></i> Sesar Terindikasi Aktif</div>
+    <div><i style="background: blue"></i> Megathrust</div>
+    <div class="export-btn" id="export-png">Export PNG</div>
+    <div class="export-btn" id="export-pdf">Export PDF</div>
+  `;
+  return div;
+};
+legend.addTo(map);
+
+// Fungsi Export Peta
+document.getElementById('export-png')?.addEventListener('click', function() {
+  const node = document.getElementById('map');
+  
+  domtoimage.toBlob(node, {
+    width: node.offsetWidth,
+    height: node.offsetHeight,
+    style: {
+      transform: 'scale(1)',
+      transformOrigin: 'top left'
+    }
+  })
+  .then(function(blob) {
+    saveAs(blob, 'peta-seismik-indonesia.png');
+  })
+  .catch(function(error) {
+    console.error('Export error:', error);
+    alert('Gagal mengekspor peta: ' + error.message);
+  });
+});
+
+document.getElementById('export-pdf')?.addEventListener('click', function() {
+  alert('Fitur export PDF membutuhkan library tambahan seperti jsPDF. Silahkan gunakan export PNG untuk saat ini.');
+});
 </script>
 </body>
 </html>

@@ -4,18 +4,21 @@
   <meta charset="utf-8" />
   <title>WebGIS PSAI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
   <!-- Leaflet & Plugins -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
-  <style> html, body, #map { height: 100%; margin: 0; } </style>
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+  </style>
 </head>
 <body>
 <div id="map"></div>
 
-<!-- Leaflet & Plugin JS -->
+<!-- JS Library -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
@@ -29,18 +32,21 @@ const map = L.map('map', {
   fullscreenControl: true
 });
 
-// Basemap
+// Basemaps
 const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
+  attribution: '© OpenStreetMap contributors',
+  errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 }).addTo(map);
 
 const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  attribution: 'Google Satellite',
   maxZoom: 20,
-  attribution: 'Google Satellite'
+  errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 });
 
 const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  attribution: '© Esri'
+  attribution: '© Esri, Earthstar Geographics',
+  errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 });
 
 const baseLayers = {
@@ -49,6 +55,7 @@ const baseLayers = {
   "ESRI World Imagery": esri
 };
 
+// Overlay GeoJSON
 const overlayLayers = {};
 const geojsonLayers = [
   {
@@ -80,6 +87,7 @@ function createPopup(feature) {
   return html;
 }
 
+// Load GeoJSON Layers
 let loaded = 0;
 geojsonLayers.forEach((layer, idx) => {
   const geojson = L.geoJSON(null, {
@@ -99,38 +107,37 @@ geojsonLayers.forEach((layer, idx) => {
       geojson.addData(data);
       overlayLayers[layer.name] = geojson;
       map.addLayer(geojson);
+
       if (idx === 0) {
-  setTimeout(() => {
-    map.fitBounds(geojson.getBounds());
-  }, 300); // delay 300ms untuk tunggu render selesai
-}
+        setTimeout(() => {
+          map.fitBounds(geojson.getBounds());
+        }, 300);
+      }
 
       loaded++;
       if (loaded === geojsonLayers.length) {
         L.control.layers(baseLayers, overlayLayers).addTo(map);
+        
+        // MiniMap setelah semua layer
+        const miniMap = new L.Control.MiniMap(osm, { toggleDisplay: true, minimized: false }).addTo(map);
       }
+    })
+    .catch(err => {
+      console.error(`Gagal memuat ${layer.file}`, err);
     });
 });
 
-// Plugin Tambahan
+// Plugins
 L.Control.geocoder().addTo(map);
 L.control.measure({ primaryLengthUnit: 'kilometers' }).addTo(map);
 L.control.fullscreen().addTo(map);
-new L.Control.MiniMap(osm, { toggleDisplay: true }).addTo(map);
 
-// Koordinat Kursor
+// Koordinat mouse
 map.on('mousemove', function (e) {
   document.getElementById('mousepos')?.remove();
   const div = document.createElement('div');
   div.id = 'mousepos';
-  div.style.position = 'fixed';
-  div.style.bottom = '5px';
-  div.style.left = '10px';
-  div.style.background = '#fff';
-  div.style.padding = '4px 8px';
-  div.style.borderRadius = '5px';
-  div.style.fontSize = '12px';
-  div.style.boxShadow = '0 0 4px rgba(0,0,0,0.3)';
+  div.style = 'position:fixed; bottom:5px; left:10px; background:#fff; padding:4px 8px; border-radius:5px; font-size:12px; box-shadow:0 0 4px rgba(0,0,0,0.3)';
   div.innerText = `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`;
   document.body.appendChild(div);
 });

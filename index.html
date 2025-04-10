@@ -4,138 +4,131 @@
   <meta charset="utf-8" />
   <title>WebGIS PSAI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Leaflet & Plugins -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
-  <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-  </style>
+  <style> html, body, #map { height: 100%; margin: 0; } </style>
 </head>
 <body>
 <div id="map"></div>
 
-<!-- Leaflet JS dan Plugin -->
+<!-- Leaflet & Plugin JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 <script src="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.js"></script>
 <script src="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.js"></script>
-<script src="https://unpkg.com/esri-leaflet"></script>
 
 <script>
-  const map = L.map('map', {
-    center: [-2.5, 117], zoom: 5,
-    fullscreenControl: true
-  });
+const map = L.map('map', {
+  center: [-2.5, 117],
+  zoom: 5,
+  fullscreenControl: true
+});
 
-  // Basemaps
-  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OSM'
-  }).addTo(map);
+// Basemap
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
 
-  const googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-    maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-    attribution: 'Google Satellite'
-  });
+const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  maxZoom: 20,
+  attribution: 'Google Satellite'
+});
 
-  const esriWorld = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles © Esri'
-  });
+const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '© Esri'
+});
 
-  const baseLayers = {
-    "OpenStreetMap": osm,
-    "Google Satellite": googleSat,
-    "ESRI World": esriWorld
-  };
+const baseLayers = {
+  "OpenStreetMap": osm,
+  "Google Satellite": satellite,
+  "ESRI World Imagery": esri
+};
 
-  const overlayLayers = {};
-
-  const geojsonLayers = [
-    {
-      name: "Sesar Aktif 2017",
-      file: "SesarAktifPuSGeN2017_9.JSON",
-      color: "red",
-      dash: "4"
-    },
-    {
-      name: "Sesar Terindikasi Aktif 2017",
-      file: "SesarTerindikasiAktif_8.JSON",
-      color: "orange",
-      dash: "2"
-    },
-    {
-      name: "Megathrust 2017",
-      file: "MegathrustPuSGeN2017_7.JSON",
-      color: "blue",
-      dash: "0"
-    }
-    // ➕ Tambah layer baru di sini (cukup copy & edit baris ini)
-  ];
-
-  // Helper untuk membuat popup
-  function createPopup(feature) {
-    let html = '<table>';
-    for (let key in feature.properties) {
-      html += `<tr><th style="text-align:left;padding-right:5px;">${key}</th><td>${feature.properties[key]}</td></tr>`;
-    }
-    html += '</table>';
-    return html;
+const overlayLayers = {};
+const geojsonLayers = [
+  {
+    name: "Sesar Aktif 2017",
+    file: "SesarAktifPuSGeN2017_9.JSON",
+    color: "red",
+    dash: ""
+  },
+  {
+    name: "Sesar Terindikasi Aktif",
+    file: "SesarTerindikasiAktif_8.JSON",
+    color: "orange",
+    dash: "4,4"
+  },
+  {
+    name: "Megathrust",
+    file: "MegathrustPuSGeN2017_7.JSON",
+    color: "blue",
+    dash: "2,6"
   }
+];
 
-  let loaded = 0;
-  geojsonLayers.forEach((layer, i) => {
-    const geojson = L.geoJSON(null, {
-      style: {
-        color: layer.color,
-        weight: 2,
-        dashArray: layer.dash
-      },
-      onEachFeature: (feature, layerObj) => {
-        layerObj.bindPopup(createPopup(feature));
+function createPopup(feature) {
+  let html = '<table>';
+  for (let key in feature.properties) {
+    html += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
+  }
+  html += '</table>';
+  return html;
+}
+
+let loaded = 0;
+geojsonLayers.forEach((layer, idx) => {
+  const geojson = L.geoJSON(null, {
+    style: {
+      color: layer.color,
+      weight: 2,
+      dashArray: layer.dash
+    },
+    onEachFeature: (feature, layerObj) => {
+      layerObj.bindPopup(createPopup(feature));
+    }
+  });
+
+  fetch(layer.file)
+    .then(res => res.json())
+    .then(data => {
+      geojson.addData(data);
+      overlayLayers[layer.name] = geojson;
+      map.addLayer(geojson);
+      if (idx === 0) map.fitBounds(geojson.getBounds());
+      loaded++;
+      if (loaded === geojsonLayers.length) {
+        L.control.layers(baseLayers, overlayLayers).addTo(map);
       }
     });
+});
 
-    fetch(layer.file)
-      .then(res => res.json())
-      .then(data => {
-        geojson.addData(data);
-        overlayLayers[layer.name] = geojson;
-        map.addLayer(geojson);
-        if (i === 0) map.fitBounds(geojson.getBounds());
-        loaded++;
-        if (loaded === geojsonLayers.length) {
-          L.control.layers(baseLayers, overlayLayers).addTo(map);
-        }
-      });
-  });
+// Plugin Tambahan
+L.Control.geocoder().addTo(map);
+L.control.measure({ primaryLengthUnit: 'kilometers' }).addTo(map);
+L.control.fullscreen().addTo(map);
+new L.Control.MiniMap(osm, { toggleDisplay: true }).addTo(map);
 
-  // Search (navigasi lokasi)
-  L.Control.geocoder().addTo(map);
-
-  // Ukur Jarak/Luas
-  L.control.measure({ primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers' }).addTo(map);
-
-  // MiniMap
-  const mini = new L.Control.MiniMap(osm, { toggleDisplay: true }).addTo(map);
-
-  // Koordinat Kursor
-  map.on('mousemove', function (e) {
-    document.getElementById('coords')?.remove();
-    const coordDiv = document.createElement('div');
-    coordDiv.id = 'coords';
-    coordDiv.style.position = 'fixed';
-    coordDiv.style.bottom = '5px';
-    coordDiv.style.left = '10px';
-    coordDiv.style.background = '#fff';
-    coordDiv.style.padding = '3px 8px';
-    coordDiv.style.borderRadius = '5px';
-    coordDiv.style.fontSize = '12px';
-    coordDiv.style.boxShadow = '0 0 4px rgba(0,0,0,0.3)';
-    coordDiv.innerText = `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`;
-    document.body.appendChild(coordDiv);
-  });
+// Koordinat Kursor
+map.on('mousemove', function (e) {
+  document.getElementById('mousepos')?.remove();
+  const div = document.createElement('div');
+  div.id = 'mousepos';
+  div.style.position = 'fixed';
+  div.style.bottom = '5px';
+  div.style.left = '10px';
+  div.style.background = '#fff';
+  div.style.padding = '4px 8px';
+  div.style.borderRadius = '5px';
+  div.style.fontSize = '12px';
+  div.style.boxShadow = '0 0 4px rgba(0,0,0,0.3)';
+  div.innerText = `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`;
+  document.body.appendChild(div);
+});
 </script>
 </body>
 </html>

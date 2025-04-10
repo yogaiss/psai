@@ -2,128 +2,139 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebGIS CONTOH</title>
+  <title>WebGIS PSAI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet & Plugin CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
   <style>
-    #map { height: 100vh; }
-    .legend {
-      background: white;
-      padding: 6px;
-      font-size: 12px;
-      line-height: 1.5;
-    }
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
   </style>
 </head>
 <body>
-  <div id="map"></div>
+<div id="map"></div>
 
-  <!-- Leaflet & Plugins -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-providers"></script>
-  <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-  <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
-  <script src="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.js"></script>
-  <script src="https://unpkg.com/leaflet-compass/dist/leaflet-compass.min.js"></script>
-  <script src="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.js"></script>
+<!-- Leaflet JS dan Plugin -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<script src="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.js"></script>
+<script src="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.js"></script>
+<script src="https://unpkg.com/esri-leaflet"></script>
 
-  <script>
-    const map = L.map('map', { fullscreenControl: true }).setView([-2.5, 117.5], 5);
+<script>
+  const map = L.map('map', {
+    center: [-2.5, 117], zoom: 5,
+    fullscreenControl: true
+  });
 
-    // --- BASEMAP ---
-    const baseLayers = {
-      "OpenStreetMap": L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map),
-      "Google Satellite": L.tileLayer.provider('Esri.WorldImagery'),
-      "Topographic": L.tileLayer.provider('OpenTopoMap')
-    };
+  // Basemaps
+  const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OSM'
+  }).addTo(map);
 
-    // --- STYLE DAN FILE LAYER GEOJSON ---
-    const geojsonLayers = [
-      {
-        name: "Sesar Aktif PuSGeN 2017",
-        file: "SesarAktifPuSGeN2017_9.JSON",
-        color: "red",
-        dash: ""
-      },
-      {
-        name: "Sesar Terindikasi Aktif",
-        file: "SesarTerindikasiAktif_8.JSON",
-        color: "orange",
-        dash: "5,5"
-      }
-      // ➕ Tambah layer baru di sini (cukup copy & edit baris ini)
-    ];
+  const googleSat = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+    attribution: 'Google Satellite'
+  });
 
-    const overlayLayers = {};
+  const esriWorld = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri'
+  });
 
-    function createPopup(feature) {
-      const props = feature.properties;
-      let html = "<table>";
-      for (let key in props) {
-        html += `<tr><td><strong>${key}</strong></td><td>${props[key]}</td></tr>`;
-      }
-      html += "</table>";
-      return html;
+  const baseLayers = {
+    "OpenStreetMap": osm,
+    "Google Satellite": googleSat,
+    "ESRI World": esriWorld
+  };
+
+  const overlayLayers = {};
+
+  const geojsonLayers = [
+    {
+      name: "Sesar Aktif 2017",
+      file: "SesarAktifPuSGeN2017_9.JSON",
+      color: "red",
+      dash: "4"
+    },
+    {
+      name: "Sesar Terindikasi Aktif 2017",
+      file: "SesarTerindikasiAktif_8.JSON",
+      color: "orange",
+      dash: "2"
+    },
+    {
+      name: "Megathrust 2017",
+      file: "MegathrustPuSGeN2017_7.JSON",
+      color: "blue",
+      dash: "0"
     }
+  ];
 
-    geojsonLayers.forEach(layer => {
-      const geojson = L.geoJSON(null, {
-        style: {
-          color: layer.color,
-          weight: 2,
-          dashArray: layer.dash
-        },
-        onEachFeature: function (feature, layerObj) {
-          layerObj.bindPopup(createPopup(feature));
-        }
-      });
+  // Helper untuk membuat popup
+  function createPopup(feature) {
+    let html = '<table>';
+    for (let key in feature.properties) {
+      html += `<tr><th style="text-align:left;padding-right:5px;">${key}</th><td>${feature.properties[key]}</td></tr>`;
+    }
+    html += '</table>';
+    return html;
+  }
 
-      fetch(layer.file)
-        .then(res => res.json())
-        .then(data => {
-          geojson.addData(data);
-          map.addLayer(geojson);
-          overlayLayers[layer.name] = geojson;
-          if (layer === geojsonLayers[0]) map.fitBounds(geojson.getBounds());
-        });
+  let loaded = 0;
+  geojsonLayers.forEach((layer, i) => {
+    const geojson = L.geoJSON(null, {
+      style: {
+        color: layer.color,
+        weight: 2,
+        dashArray: layer.dash
+      },
+      onEachFeature: (feature, layerObj) => {
+        layerObj.bindPopup(createPopup(feature));
+      }
     });
 
-    // --- CONTROL ---
-    L.control.layers(baseLayers, overlayLayers).addTo(map);
-    L.Control.geocoder().addTo(map);
-    L.control.measure({ primaryLengthUnit: 'kilometers' }).addTo(map);
-    new L.Control.MiniMap(L.tileLayer.provider('OpenStreetMap.Mapnik'), { toggleDisplay: true }).addTo(map);
-    L.control.compass({ autoActive: true }).addTo(map);
-
-    // --- LEGEND ---
-    L.control({ position: "bottomright" }).onAdd = function () {
-      const div = L.DomUtil.create("div", "legend");
-      div.innerHTML = "<strong>Legenda</strong><br>";
-      geojsonLayers.forEach(l => {
-        div.innerHTML += `<i style="background:${l.color};width:12px;height:2px;display:inline-block;margin-right:4px;"></i>${l.name}<br>`;
+    fetch(layer.file)
+      .then(res => res.json())
+      .then(data => {
+        geojson.addData(data);
+        overlayLayers[layer.name] = geojson;
+        map.addLayer(geojson);
+        if (i === 0) map.fitBounds(geojson.getBounds());
+        loaded++;
+        if (loaded === geojsonLayers.length) {
+          L.control.layers(baseLayers, overlayLayers).addTo(map);
+        }
       });
-      return div;
-    }.addTo(map);
+  });
 
-    // --- KOORDINAT MOUSE ---
-    L.control.mousePosition = function (opts = {}) {
-      const control = L.control({ position: opts.position || 'bottomleft' });
-      control.onAdd = function () {
-        const container = L.DomUtil.create('div');
-        map.on('mousemove', function (e) {
-          container.innerHTML = `Koordinat: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
-        });
-        return container;
-      };
-      return control;
-    };
-    L.control.mousePosition().addTo(map);
-  </script>
+  // Search (navigasi lokasi)
+  L.Control.geocoder().addTo(map);
+
+  // Ukur Jarak/Luas
+  L.control.measure({ primaryLengthUnit: 'meters', secondaryLengthUnit: 'kilometers' }).addTo(map);
+
+  // MiniMap
+  const mini = new L.Control.MiniMap(osm, { toggleDisplay: true }).addTo(map);
+
+  // Koordinat Kursor
+  map.on('mousemove', function (e) {
+    document.getElementById('coords')?.remove();
+    const coordDiv = document.createElement('div');
+    coordDiv.id = 'coords';
+    coordDiv.style.position = 'fixed';
+    coordDiv.style.bottom = '5px';
+    coordDiv.style.left = '10px';
+    coordDiv.style.background = '#fff';
+    coordDiv.style.padding = '3px 8px';
+    coordDiv.style.borderRadius = '5px';
+    coordDiv.style.fontSize = '12px';
+    coordDiv.style.boxShadow = '0 0 4px rgba(0,0,0,0.3)';
+    coordDiv.innerText = `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`;
+    document.body.appendChild(coordDiv);
+  });
+</script>
 </body>
 </html>

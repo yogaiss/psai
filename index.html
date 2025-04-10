@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebGIS PSAI 2</title>
+  <title>WebGIS PSAI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
   <!-- Leaflet & Plugins -->
@@ -26,21 +26,15 @@
 <script src="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.js"></script>
 
 <script>
-const map = L.map('map', {
-  center: [-2.5, 117],
-  zoom: 5,
-  fullscreenControl: true
-});
-
 // Basemaps
-const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors',
-  errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
-}).addTo(map);
-
 const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
   attribution: 'Google Satellite',
   maxZoom: 20,
+  errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
+});
+
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
   errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 });
 
@@ -49,13 +43,20 @@ const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/W
   errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 });
 
+// Peta Utama dengan Google Satellite sebagai default
+const map = L.map('map', {
+  center: [-2.5, 117],
+  zoom: 5,
+  layers: [satellite], // set default layer
+  fullscreenControl: true
+});
+
 const baseLayers = {
-  "OpenStreetMap": osm,
   "Google Satellite": satellite,
+  "OpenStreetMap": osm,
   "ESRI World Imagery": esri
 };
 
-// Overlay GeoJSON
 const overlayLayers = {};
 const geojsonLayers = [
   {
@@ -87,8 +88,10 @@ function createPopup(feature) {
   return html;
 }
 
-// Load GeoJSON Layers
+// Load GeoJSON dan sinkron fitBounds
 let loaded = 0;
+let firstGeojsonBounds = null;
+
 geojsonLayers.forEach((layer, idx) => {
   const geojson = L.geoJSON(null, {
     style: {
@@ -108,18 +111,23 @@ geojsonLayers.forEach((layer, idx) => {
       overlayLayers[layer.name] = geojson;
       map.addLayer(geojson);
 
+      // Simpan bounds pertama untuk sinkronisasi tampilan
       if (idx === 0) {
-        setTimeout(() => {
-          map.fitBounds(geojson.getBounds());
-        }, 300);
+        firstGeojsonBounds = geojson.getBounds();
       }
 
       loaded++;
       if (loaded === geojsonLayers.length) {
         L.control.layers(baseLayers, overlayLayers).addTo(map);
-        
-        // MiniMap setelah semua layer
-        const miniMap = new L.Control.MiniMap(osm, { toggleDisplay: true, minimized: false }).addTo(map);
+
+        if (firstGeojsonBounds) {
+          setTimeout(() => {
+            map.fitBounds(firstGeojsonBounds);
+          }, 400); // sedikit delay agar base map sudah dirender
+        }
+
+        // MiniMap aktif setelah semua selesai
+        new L.Control.MiniMap(satellite, { toggleDisplay: true, minimized: false }).addTo(map);
       }
     })
     .catch(err => {

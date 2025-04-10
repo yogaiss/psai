@@ -2,13 +2,12 @@
 <html lang="id">
 <head>
   <meta charset="utf-8" />
-  <title>WebGIS PSAI 3 - Peta Seismik Indonesia</title>
+  <title>WebGIS Peta Seismik Indonesia</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Peta WebGIS untuk menampilkan informasi sesar aktif dan megathrust di Indonesia">
   
   <!-- Leaflet & Plugins -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
   <style>
@@ -89,21 +88,6 @@
       margin-bottom: 4px;
     }
     
-    .export-btn {
-      padding: 6px 10px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      cursor: pointer;
-      margin-top: 10px;
-      width: 100%;
-      text-align: center;
-    }
-    
-    .export-btn:hover {
-      background: #f5f5f5;
-    }
-    
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -119,11 +103,8 @@
 
 <!-- JS Library -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 <script src="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.js"></script>
-<script src="https://unpkg.com/dom-to-image@2.6.0/dist/dom-to-image.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
 <script>
 // Basemaps
@@ -135,12 +116,6 @@ const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z
 
 const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors',
-  maxZoom: 19,
-  errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
-});
-
-const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-  attribution: '© Esri, Earthstar Geographics',
   maxZoom: 19,
   errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 });
@@ -160,8 +135,7 @@ L.control.zoom({
 
 const baseLayers = {
   "Google Satellite": satellite,
-  "OpenStreetMap": osm,
-  "ESRI World Imagery": esri
+  "OpenStreetMap": osm
 };
 
 const overlayLayers = {};
@@ -264,7 +238,7 @@ geojsonLayers.forEach((layer) => {
     });
 });
 
-// Plugins
+// Geocoder untuk pencarian lokasi
 L.Control.geocoder({
   position: 'topleft',
   defaultMarkGeocode: false
@@ -272,16 +246,7 @@ L.Control.geocoder({
   map.fitBounds(e.geocode.bbox, { maxZoom: 15 });
 }).addTo(map);
 
-L.control.measure({
-  primaryLengthUnit: 'kilometers',
-  secondaryLengthUnit: 'meters',
-  primaryAreaUnit: 'hectares',
-  activeColor: '#3b5998',
-  completedColor: '#3b5998',
-  position: 'topleft'
-}).addTo(map);
-
-// Fullscreen control (hanya satu)
+// Fullscreen control
 L.control.fullscreen({
   position: 'topleft',
   title: 'Layar Penuh',
@@ -328,37 +293,10 @@ legend.onAdd = function() {
     <div><i style="background: red"></i> Sesar Aktif 2017</div>
     <div><i style="background: orange"></i> Sesar Terindikasi Aktif</div>
     <div><i style="background: blue"></i> Megathrust</div>
-    <div class="export-btn" id="export-png">Export PNG</div>
-    <div class="export-btn" id="export-pdf">Export PDF</div>
   `;
   return div;
 };
 legend.addTo(map);
-
-// Fungsi Export Peta
-document.getElementById('export-png')?.addEventListener('click', function() {
-  const node = document.getElementById('map');
-  
-  domtoimage.toBlob(node, {
-    width: node.offsetWidth,
-    height: node.offsetHeight,
-    style: {
-      transform: 'scale(1)',
-      transformOrigin: 'top left'
-    }
-  })
-  .then(function(blob) {
-    saveAs(blob, 'peta-seismik-indonesia.png');
-  })
-  .catch(function(error) {
-    console.error('Export error:', error);
-    alert('Gagal mengekspor peta: ' + error.message);
-  });
-});
-
-document.getElementById('export-pdf')?.addEventListener('click', function() {
-  alert('Fitur export PDF membutuhkan library tambahan seperti jsPDF. Silahkan gunakan export PNG untuk saat ini.');
-});
 </script>
 </body>
 </html>

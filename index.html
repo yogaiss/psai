@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
   <meta charset="utf-8" />
-  <title>WebGIS PSAI 3</title>
+  <title>WebGIS PSAI 3 - Peta Seismik Indonesia</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Peta WebGIS untuk menampilkan informasi sesar aktif dan megathrust di Indonesia">
   
   <!-- Leaflet & Plugins -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,11 +13,70 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
   <style>
-    html, body, #map { height: 100%; margin: 0; }
+    html, body, #map { 
+      height: 100%; 
+      margin: 0; 
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+    
+    .leaflet-control-layers {
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
+    .leaflet-popup-content table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .leaflet-popup-content th, 
+    .leaflet-popup-content td {
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+    }
+    
+    .leaflet-popup-content th {
+      background-color: #f2f2f2;
+      text-align: left;
+    }
+    
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px 25px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border-left-color: #09f;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="loading">
+  <div class="spinner"></div>
+  <span>Memuat data peta...</span>
+</div>
 
 <!-- JS Library -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -35,11 +95,13 @@ const satellite = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z
 
 const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors',
+  maxZoom: 19,
   errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 });
 
 const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   attribution: '© Esri, Earthstar Geographics',
+  maxZoom: 19,
   errorTileUrl: 'https://tile.openstreetmap.org/0/0/0.png'
 });
 
@@ -48,8 +110,14 @@ const map = L.map('map', {
   center: [-2.5, 117],
   zoom: 5,
   layers: [satellite], // set default layer
-  fullscreenControl: true
+  fullscreenControl: true,
+  zoomControl: false
 });
+
+// Tambahkan zoom control di pojok kanan bawah
+L.control.zoom({
+  position: 'bottomright'
+}).addTo(map);
 
 const baseLayers = {
   "Google Satellite": satellite,
@@ -63,41 +131,48 @@ const geojsonLayers = [
     name: "Sesar Aktif 2017",
     file: "SesarAktifPuSGeN2017_9.JSON",
     color: "red",
-    dash: ""
+    dash: "",
+    weight: 3
   },
   {
     name: "Sesar Terindikasi Aktif",
     file: "SesarTerindikasiAktif_8.JSON",
     color: "orange",
-    dash: "4,4"
+    dash: "4,4",
+    weight: 2
   },
   {
     name: "Megathrust",
     file: "MegathrustPuSGeN2017_7.JSON",
     color: "blue",
-    dash: "2,6"
+    dash: "2,6",
+    weight: 3
   }
 ];
 
 function createPopup(feature) {
-  let html = '<table>';
+  let html = '<div class="popup-content"><table>';
   for (let key in feature.properties) {
-    html += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
+    // Skip properties yang kosong atau null
+    if (feature.properties[key] !== null && feature.properties[key] !== "") {
+      html += `<tr><th>${key}</th><td>${feature.properties[key]}</td></tr>`;
+    }
   }
-  html += '</table>';
+  html += '</table></div>';
   return html;
 }
 
 // Load GeoJSON dan sinkron fitBounds
 let loaded = 0;
-let firstGeojsonBounds = null;
+let allBounds = [];
 
-geojsonLayers.forEach((layer, idx) => {
+geojsonLayers.forEach((layer) => {
   const geojson = L.geoJSON(null, {
     style: {
       color: layer.color,
-      weight: 2,
-      dashArray: layer.dash
+      weight: layer.weight,
+      dashArray: layer.dash,
+      opacity: 0.8
     },
     onEachFeature: (feature, layerObj) => {
       layerObj.bindPopup(createPopup(feature));
@@ -105,50 +180,118 @@ geojsonLayers.forEach((layer, idx) => {
   });
 
   fetch(layer.file)
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        throw new Error(`Gagal memuat ${layer.file}: ${res.statusText}`);
+      }
+      return res.json();
+    })
     .then(data => {
       geojson.addData(data);
       overlayLayers[layer.name] = geojson;
       map.addLayer(geojson);
 
-      // Simpan bounds pertama untuk sinkronisasi tampilan
-      if (idx === 0) {
-        firstGeojsonBounds = geojson.getBounds();
+      // Simpan bounds untuk semua layer
+      const bounds = geojson.getBounds();
+      if (bounds.isValid()) {
+        allBounds.push(bounds);
       }
 
       loaded++;
       if (loaded === geojsonLayers.length) {
-        L.control.layers(baseLayers, overlayLayers).addTo(map);
+        // Sembunyikan loading indicator
+        document.getElementById('loading').style.display = 'none';
+        
+        // Tambahkan layer control setelah semua layer dimuat
+        L.control.layers(baseLayers, overlayLayers, {
+          collapsed: false,
+          position: 'topright'
+        }).addTo(map);
 
-        if (firstGeojsonBounds) {
+        // Fit bounds untuk semua layer yang valid
+        if (allBounds.length > 0) {
+          const combinedBounds = allBounds.reduce((acc, bounds) => {
+            return acc.extend(bounds);
+          }, allBounds[0]);
+          
           setTimeout(() => {
-            map.fitBounds(firstGeojsonBounds);
-          }, 400); // sedikit delay agar base map sudah dirender
+            map.fitBounds(combinedBounds, { padding: [50, 50] });
+          }, 500);
         }
 
         // MiniMap aktif setelah semua selesai
-        new L.Control.MiniMap(satellite, { toggleDisplay: true, minimized: false }).addTo(map);
+        new L.Control.MiniMap(osm, { 
+          toggleDisplay: true, 
+          minimized: false,
+          position: 'bottomleft',
+          width: 200,
+          height: 150
+        }).addTo(map);
       }
     })
     .catch(err => {
       console.error(`Gagal memuat ${layer.file}`, err);
+      loaded++;
+      if (loaded === geojsonLayers.length) {
+        document.getElementById('loading').style.display = 'none';
+        L.control.layers(baseLayers, overlayLayers).addTo(map);
+      }
     });
 });
 
 // Plugins
-L.Control.geocoder().addTo(map);
-L.control.measure({ primaryLengthUnit: 'kilometers' }).addTo(map);
-L.control.fullscreen().addTo(map);
+L.Control.geocoder({
+  position: 'topleft',
+  defaultMarkGeocode: false
+}).on('markgeocode', function(e) {
+  map.fitBounds(e.geocode.bbox, { maxZoom: 15 });
+}).addTo(map);
+
+L.control.measure({
+  primaryLengthUnit: 'kilometers',
+  secondaryLengthUnit: 'meters',
+  primaryAreaUnit: 'hectares',
+  activeColor: '#3b5998',
+  completedColor: '#3b5998',
+  position: 'topleft'
+}).addTo(map);
+
+L.control.fullscreen({
+  position: 'topleft',
+  title: 'Layar Penuh',
+  titleCancel: 'Keluar dari Layar Penuh'
+}).addTo(map);
 
 // Koordinat mouse
-map.on('mousemove', function (e) {
-  document.getElementById('mousepos')?.remove();
-  const div = document.createElement('div');
-  div.id = 'mousepos';
-  div.style = 'position:fixed; bottom:5px; left:10px; background:#fff; padding:4px 8px; border-radius:5px; font-size:12px; box-shadow:0 0 4px rgba(0,0,0,0.3)';
-  div.innerText = `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`;
-  document.body.appendChild(div);
+const mousePosition = L.control({position: 'bottomleft'});
+mousePosition.onAdd = function() {
+  this._div = L.DomUtil.create('div', 'mouse-position');
+  this.update();
+  return this._div;
+};
+mousePosition.update = function(latlng) {
+  if (latlng) {
+    this._div.innerHTML = `Lat: ${latlng.lat.toFixed(4)}, Lng: ${latlng.lng.toFixed(4)}`;
+  } else {
+    this._div.innerHTML = 'Gerakkan mouse di peta';
+  }
+};
+mousePosition.addTo(map);
+
+map.on('mousemove', function(e) {
+  mousePosition.update(e.latlng);
 });
+
+map.on('mouseout', function() {
+  mousePosition.update();
+});
+
+// Tambahkan skala
+L.control.scale({
+  position: 'bottomright',
+  imperial: false,
+  maxWidth: 200
+}).addTo(map);
 </script>
 </body>
 </html>

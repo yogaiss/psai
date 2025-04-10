@@ -2,16 +2,15 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebGIS PSAI Lengkap</title>
+  <title>WebGIS CONTOH</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <!-- Leaflet & Plugin CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
-
   <style>
     #map { height: 100vh; }
     .legend {
@@ -25,7 +24,7 @@
 <body>
   <div id="map"></div>
 
-  <!-- JS Libraries -->
+  <!-- Leaflet & Plugins -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet-providers"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
@@ -35,104 +34,102 @@
   <script src="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.js"></script>
 
   <script>
-    // Inisialisasi peta
-    var map = L.map('map', {
-      fullscreenControl: true
-    }).setView([-2.5, 117.5], 5);
+    const map = L.map('map', { fullscreenControl: true }).setView([-2.5, 117.5], 5);
 
-    // Basemaps
-    var osm = L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map);
-    var satellite = L.tileLayer.provider('Esri.WorldImagery');
-    var topo = L.tileLayer.provider('OpenTopoMap');
-
-    var baseLayers = {
-      "OpenStreetMap": osm,
-      "Google Satellite": satellite,
-      "Topographic": topo
+    // --- BASEMAP ---
+    const baseLayers = {
+      "OpenStreetMap": L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map),
+      "Google Satellite": L.tileLayer.provider('Esri.WorldImagery'),
+      "Topographic": L.tileLayer.provider('OpenTopoMap')
     };
 
-    // Layer GeoJSON
-    var sesarLayer = L.geoJSON(null, {
-      style: { color: "red", weight: 2 },
-      onEachFeature: function (feature, layer) {
-        var props = feature.properties;
-        let html = "<table>";
-        for (let key in props) {
-          html += `<tr><td><strong>${key}</strong></td><td>${props[key]}</td></tr>`;
-        }
-        html += "</table>";
-        layer.bindPopup(html);
+    // --- STYLE DAN FILE LAYER GEOJSON ---
+    const geojsonLayers = [
+      {
+        name: "Sesar Aktif PuSGeN 2017",
+        file: "SesarAktifPuSGeN2017_9.JSON",
+        color: "red",
+        dash: ""
+      },
+      {
+        name: "Sesar Terindikasi Aktif",
+        file: "SesarTerindikasiAktif_8.JSON",
+        color: "orange",
+        dash: "5,5"
       }
-    });
+      {
+        name: "Megathrust PuSGeN 2017",
+        file: "MegathrustPuSGeN2017_7.JSON",
+        color: "blue",
+        dash: "4,5"
+      }
+      // ➕ Tambah layer baru di sini (cukup copy & edit baris ini)
+    ];
 
-    // Load GeoJSON file
-    fetch("SesarAktifPuSGeN2017_9.JSON")
-      .then(res => res.json())
-      .then(data => {
-        sesarLayer.addData(data);
-        map.fitBounds(sesarLayer.getBounds());
+    const overlayLayers = {};
+
+    function createPopup(feature) {
+      const props = feature.properties;
+      let html = "<table>";
+      for (let key in props) {
+        html += `<tr><td><strong>${key}</strong></td><td>${props[key]}</td></tr>`;
+      }
+      html += "</table>";
+      return html;
+    }
+
+    geojsonLayers.forEach(layer => {
+      const geojson = L.geoJSON(null, {
+        style: {
+          color: layer.color,
+          weight: 2,
+          dashArray: layer.dash
+        },
+        onEachFeature: function (feature, layerObj) {
+          layerObj.bindPopup(createPopup(feature));
+        }
       });
 
-    // Layer control
-    var overlays = {
-      "Sesar Aktif 2017": sesarLayer
-    };
-    L.control.layers(baseLayers, overlays).addTo(map);
+      fetch(layer.file)
+        .then(res => res.json())
+        .then(data => {
+          geojson.addData(data);
+          map.addLayer(geojson);
+          overlayLayers[layer.name] = geojson;
+          if (layer === geojsonLayers[0]) map.fitBounds(geojson.getBounds());
+        });
+    });
 
-    // Geocoder (search)
+    // --- CONTROL ---
+    L.control.layers(baseLayers, overlayLayers).addTo(map);
     L.Control.geocoder().addTo(map);
+    L.control.measure({ primaryLengthUnit: 'kilometers' }).addTo(map);
+    new L.Control.MiniMap(L.tileLayer.provider('OpenStreetMap.Mapnik'), { toggleDisplay: true }).addTo(map);
+    L.control.compass({ autoActive: true }).addTo(map);
 
-    // Ukur jarak/luas
-    L.control.measure({
-      primaryLengthUnit: 'kilometers',
-      primaryAreaUnit: 'hectares'
-    }).addTo(map);
+    // --- LEGEND ---
+    L.control({ position: "bottomright" }).onAdd = function () {
+      const div = L.DomUtil.create("div", "legend");
+      div.innerHTML = "<strong>Legenda</strong><br>";
+      geojsonLayers.forEach(l => {
+        div.innerHTML += `<i style="background:${l.color};width:12px;height:2px;display:inline-block;margin-right:4px;"></i>${l.name}<br>`;
+      });
+      return div;
+    }.addTo(map);
 
-    // Mini Map
-    var miniMap = new L.Control.MiniMap(L.tileLayer.provider('OpenStreetMap.Mapnik'), {
-      toggleDisplay: true,
-      minimized: false
-    }).addTo(map);
-
-    // Kompas
-    L.control.compass({ autoActive: true, showDigit: true }).addTo(map);
-
-    // Koordinat saat mouse bergerak
-    L.control.mousePosition = function(opts) {
-      var defaultOptions = {
-        position: 'bottomleft',
-        separator: ' | ',
-        emptyString: 'Gerakkan mouse...',
-        lngFirst: false,
-        numDigits: 5,
-        prefix: "Koordinat:"
-      };
-      var options = Object.assign({}, defaultOptions, opts);
-      var control = L.control({position: options.position});
+    // --- KOORDINAT MOUSE ---
+    L.control.mousePosition = function (opts = {}) {
+      const control = L.control({ position: opts.position || 'bottomleft' });
       control.onAdd = function () {
-        var container = L.DomUtil.create('div', 'leaflet-control-mouseposition');
+        const container = L.DomUtil.create('div');
         map.on('mousemove', function (e) {
-          var lng = L.Util.formatNum(e.latlng.lng, options.numDigits);
-          var lat = L.Util.formatNum(e.latlng.lat, options.numDigits);
-          container.innerHTML = `${options.prefix} ${lat}, ${lng}`;
+          container.innerHTML = `Koordinat: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
         });
         return container;
       };
       return control;
     };
     L.control.mousePosition().addTo(map);
-
-    // Legenda
-    var legend = L.control({ position: "bottomright" });
-    legend.onAdd = function () {
-      var div = L.DomUtil.create("div", "legend");
-      div.innerHTML += "<strong>Legenda</strong><br>";
-      div.innerHTML += `<i style="background:red;width:12px;height:2px;display:inline-block;margin-right:4px;"></i>Sesar Aktif<br>`;
-      return div;
-    };
-    legend.addTo(map);
-
-    // Tambahan (misalnya filter bisa ditambahkan di tahap berikut)
   </script>
 </body>
 </html>

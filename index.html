@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Contoh WebGIS</title>
+  <title>WebGIS Sesar Aktif</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- CSS Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
   <style>
     #map { height: 100vh; }
   </style>
@@ -14,26 +15,31 @@
 <body>
   <div id="map"></div>
 
-  <!-- JS Leaflet -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
   <script>
     // Inisialisasi peta
-    var map = L.map('map').setView([-2.5, 118], 5); // Koordinat tengah Indonesia
+    var map = L.map('map').setView([-2.5, 118], 5); // Sesuaikan koordinat tengahnya
 
-    // Tambah basemap (OpenStreetMap)
+    // Tambahkan basemap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Tambahkan layer GeoJSON lokal
-    fetch('dataku.geojson') // ganti dengan file kamu
-      .then(res => res.json())
+    // Load file GeoJSON
+    fetch('SesarAktifPuSGeN2017_9.JSON')
+      .then(response => response.json())
       .then(data => {
         L.geoJSON(data, {
-          onEachFeature: function (feature, layer) {
-            layer.bindPopup(feature.properties.nama || 'Fitur'); // ganti sesuai atribut
+          style: {
+            color: "red",
+            weight: 2
           }
         }).addTo(map);
+      })
+      .catch(error => {
+        console.error('Gagal memuat GeoJSON:', error);
       });
   </script>
 </body>

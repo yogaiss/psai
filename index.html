@@ -2,81 +2,137 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>WebGIS PSAI</title>
+  <title>WebGIS PSAI Lengkap</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS -->
+  
+  <!-- Leaflet & Plugin CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-  <!-- Leaflet plugins -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.css" />
 
   <style>
     #map { height: 100vh; }
+    .legend {
+      background: white;
+      padding: 6px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
+  <!-- JS Libraries -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <!-- Plugins -->
+  <script src="https://unpkg.com/leaflet-providers"></script>
   <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
   <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script>
-  <script src="https://unpkg.com/leaflet-providers"></script>
+  <script src="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.js"></script>
+  <script src="https://unpkg.com/leaflet-compass/dist/leaflet-compass.min.js"></script>
+  <script src="https://unpkg.com/leaflet.fullscreen/Control.FullScreen.js"></script>
 
-  <!-- Peta -->
   <script>
-    var map = L.map('map').setView([-2.5, 117.5], 5);
+    // Inisialisasi peta
+    var map = L.map('map', {
+      fullscreenControl: true
+    }).setView([-2.5, 117.5], 5);
 
-    // Basemap pilihan
-    var basemaps = {
-      "OpenStreetMap": L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map),
-      "Google Satelite": L.tileLayer.provider('Esri.WorldImagery'),
-      "Topo": L.tileLayer.provider('OpenTopoMap')
+    // Basemaps
+    var osm = L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map);
+    var satellite = L.tileLayer.provider('Esri.WorldImagery');
+    var topo = L.tileLayer.provider('OpenTopoMap');
+
+    var baseLayers = {
+      "OpenStreetMap": osm,
+      "Google Satellite": satellite,
+      "Topographic": topo
     };
 
-    // Layer geojson (replace with your file)
-    var sesarAktif = L.geoJSON(null, {
+    // Layer GeoJSON
+    var sesarLayer = L.geoJSON(null, {
+      style: { color: "red", weight: 2 },
       onEachFeature: function (feature, layer) {
-        let info = '';
-        for (let key in feature.properties) {
-          info += `<strong>${key}</strong>: ${feature.properties[key]}<br>`;
+        var props = feature.properties;
+        let html = "<table>";
+        for (let key in props) {
+          html += `<tr><td><strong>${key}</strong></td><td>${props[key]}</td></tr>`;
         }
-        layer.bindPopup(info);
-      },
-      style: {
-        color: 'red',
-        weight: 2
+        html += "</table>";
+        layer.bindPopup(html);
       }
     });
 
-    // Load file GeoJSON
-    fetch('SesarAktifPuSGeN2017_9.JSON')
+    // Load GeoJSON file
+    fetch("SesarAktifPuSGeN2017_9.JSON")
       .then(res => res.json())
       .then(data => {
-        sesarAktif.addData(data);
-        map.fitBounds(sesarAktif.getBounds());
+        sesarLayer.addData(data);
+        map.fitBounds(sesarLayer.getBounds());
       });
 
     // Layer control
     var overlays = {
-      "Sesar Aktif 2017": sesarAktif
+      "Sesar Aktif 2017": sesarLayer
     };
-    L.control.layers(basemaps, overlays).addTo(map);
+    L.control.layers(baseLayers, overlays).addTo(map);
 
     // Geocoder (search)
     L.Control.geocoder().addTo(map);
 
-    // Alat ukur
+    // Ukur jarak/luas
     L.control.measure({
       primaryLengthUnit: 'kilometers',
-      primaryAreaUnit: 'hectares',
-      activeColor: '#ff0000',
-      completedColor: '#00ff00'
+      primaryAreaUnit: 'hectares'
     }).addTo(map);
+
+    // Mini Map
+    var miniMap = new L.Control.MiniMap(L.tileLayer.provider('OpenStreetMap.Mapnik'), {
+      toggleDisplay: true,
+      minimized: false
+    }).addTo(map);
+
+    // Kompas
+    L.control.compass({ autoActive: true, showDigit: true }).addTo(map);
+
+    // Koordinat saat mouse bergerak
+    L.control.mousePosition = function(opts) {
+      var defaultOptions = {
+        position: 'bottomleft',
+        separator: ' | ',
+        emptyString: 'Gerakkan mouse...',
+        lngFirst: false,
+        numDigits: 5,
+        prefix: "Koordinat:"
+      };
+      var options = Object.assign({}, defaultOptions, opts);
+      var control = L.control({position: options.position});
+      control.onAdd = function () {
+        var container = L.DomUtil.create('div', 'leaflet-control-mouseposition');
+        map.on('mousemove', function (e) {
+          var lng = L.Util.formatNum(e.latlng.lng, options.numDigits);
+          var lat = L.Util.formatNum(e.latlng.lat, options.numDigits);
+          container.innerHTML = `${options.prefix} ${lat}, ${lng}`;
+        });
+        return container;
+      };
+      return control;
+    };
+    L.control.mousePosition().addTo(map);
+
+    // Legenda
+    var legend = L.control({ position: "bottomright" });
+    legend.onAdd = function () {
+      var div = L.DomUtil.create("div", "legend");
+      div.innerHTML += "<strong>Legenda</strong><br>";
+      div.innerHTML += `<i style="background:red;width:12px;height:2px;display:inline-block;margin-right:4px;"></i>Sesar Aktif<br>`;
+      return div;
+    };
+    legend.addTo(map);
+
+    // Tambahan (misalnya filter bisa ditambahkan di tahap berikut)
   </script>
 </body>
 </html>

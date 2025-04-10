@@ -99,7 +99,12 @@ geojsonLayers.forEach((layer, idx) => {
       geojson.addData(data);
       overlayLayers[layer.name] = geojson;
       map.addLayer(geojson);
-      if (idx === 0) map.fitBounds(geojson.getBounds());
+      if (idx === 0) {
+  setTimeout(() => {
+    map.fitBounds(geojson.getBounds());
+  }, 300); // delay 300ms untuk tunggu render selesai
+}
+
       loaded++;
       if (loaded === geojsonLayers.length) {
         L.control.layers(baseLayers, overlayLayers).addTo(map);

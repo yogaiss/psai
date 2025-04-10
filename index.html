@@ -286,7 +286,21 @@ map.on('mousemove', function(e) {
 map.on('mouseout', function() {
   mousePosition.update();
 });
-
+  
+// Tambahkan legenda dinamis
+const legend = L.control({position: 'bottomright'});
+legend.onAdd = function() {
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = `
+    <h4>Legenda</h4>
+    <div><i style="background:red"></i> Sesar Aktif</div>
+    <div><i style="background:orange"></i> Sesar Terindikasi</div>
+    <div><i style="background:blue"></i> Megathrust</div>
+  `;
+  return div;
+};
+legend.addTo(map);
+  
 // Tambahkan skala
 L.control.scale({
   position: 'bottomright',
